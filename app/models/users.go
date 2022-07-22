@@ -14,6 +14,14 @@ type User struct {
 	Created_at time.Time
 }
 
+type Session struct {
+	ID         int
+	UUID       string
+	Email      string
+	UserID     string
+	Created_at time.Time
+}
+
 func (u *User) CreateUser() (err error) {
 	cmd := `INSERT INTO users(
 		uuid,
@@ -77,5 +85,89 @@ func (u User) DeleteUser() (err error) {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	return
+}
+
+func GetUserByEmail(email string) (user User, err error) {
+	user = User{}
+	cmd := `SELECT
+		id,
+		uuid,
+		name,
+		email,
+		password,
+		created_at
+		FROM users
+		WHERE email = ?`
+
+	err = Db.QueryRow(cmd, email).Scan(
+		&user.ID,
+		&user.UUID,
+		&user.Name,
+		&user.Email,
+		&user.Password,
+		&user.Created_at)
+
+	return
+}
+
+func (u *User) CreateSession() (session Session, err error) {
+	session = Session{}
+	cmd1 := `INSERT INTO sessions (
+		uuid,
+		email,
+		user_id,
+		created_at) VALUES(?, ?, ?, ?)`
+
+	_, err = Db.Exec(cmd1, createUUID(), u.Email, u.ID, time.Now())
+	if err != nil {
+		log.Println(err)
+	}
+
+	cmd2 := `SELECT id, uuid, email, user_id, created_at
+		FROM sessions
+		WHERE user_id = ? AND email = ?`
+
+	err = Db.QueryRow(cmd2, u.ID, u.Email).Scan(
+		&session.ID,
+		&session.UUID,
+		&session.Email,
+		&session.UserID,
+		&session.Created_at)
+
+	return
+}
+
+func (sess *Session) CheckSession() (valid bool, err error) {
+	cmd := `SELECT id, uuid, email, user_id, created_at
+		FROM sessions WHERE uuid = ?`
+
+	err = Db.QueryRow(cmd, sess.UUID).Scan(
+		&sess.ID,
+		&sess.UUID,
+		&sess.Email,
+		&sess.UserID,
+		&sess.Created_at)
+
+	if err != nil {
+		valid = false
+		return
+	}
+	if sess.ID != 0 {
+		valid = true
+	}
+
+	return
+}
+
+func (sess *Session) DeleteSessionByUUID() (err error) {
+	cmd := `DELETE FROM sessions
+		WHERE UUID = ?`
+
+	_, err = Db.Exec(cmd, sess.UUID)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	return
 }
